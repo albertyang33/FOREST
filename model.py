@@ -225,14 +225,14 @@ class RRModel(nn.Module):
 
             # net emb
             if self.rnn_model.use_network:
-                nb1 = self.rnn_model.neighbor_sampling(outputs_id[:,-1].long().cpu().numpy(), self.rnn_model.nnl1) #(batch*1)*nnl1
+                nb1 = self.rnn_model.neighbor_sampling(outputs_id[:,t-1].long().cpu().numpy(), self.rnn_model.nnl1) #(batch*1)*nnl1
                 nb2 = self.rnn_model.neighbor_sampling(nb1.reshape(-1), self.rnn_model.nnl2) #(batch*len*nnl1)*nnl2    
                 nf2 = nn.functional.relu(self.rnn_model.gcn2(self.rnn_model.net_emb[nb2,:]).mean(dim=1).view(-1,self.rnn_model.nnl1,self.rnn_model.nhid)) #(batch*len)*nnl1*nhid
                 nf1 = nn.functional.relu(self.rnn_model.gcn1(nf2).mean(dim=1).view(input.size(0),self.rnn_model.nhid))
                 nfs[:,t,:] = nf1
                 net_emb = nfs[:,t-self.rnn_model.mem_size+1:t+1,:].mean(dim=1)
 
-            step_input = self.rnn_model.encoder(outputs_id[:,-1].long())
+            step_input = self.rnn_model.encoder(outputs_id[:,t-1].long())
             if self.rnn_model.pos_emb:
                 hidden = self.rnn_model.rnn(torch.cat([step_input,self.rnn_model.drop(self.rnn_model.pos_embedding(torch.ones(batch_size).long().cuda()*t))],dim=1), hidden)
             else:
@@ -243,7 +243,7 @@ class RRModel(nn.Module):
             else:
                 output = hidden
             decoded = self.rnn_model.decoder(output) #b*v
-            result = decoded + torch.autograd.Variable(torch.zeros(batch_size,self.rnn_model.user_size).cuda().scatter_(1,outputs_id.long(),float('-inf')),requires_grad=False)
+            result = decoded + torch.autograd.Variable(torch.zeros(batch_size,self.rnn_model.user_size).cuda().scatter_(1,outputs_id[:,:t].long(),float('-inf')),requires_grad=False)
             #top1 = result.data.max(1)[1]
             top1 = torch.multinomial(torch.nn.functional.softmax(result,dim=1),1).squeeze()
             #print(top1.size())
